@@ -1,0 +1,135 @@
+#!/usr/bin/env node
+
+/**
+ * Module dependencies.
+ */
+
+var app = require('../app');
+var debug = require('debug')('accent-conversion:server');
+var http = require('https');
+const socket = require("socket.io");
+const fs = require('fs')
+/**
+ * Get port from environment and store in Express.
+ */
+
+var http_option = {
+  key: fs.readFileSync("C:/Users/mohit.barua_infobean/Downloads/PrivateKey.key"),
+  cert: fs.readFileSync("C:/Users/mohit.barua_infobean/Downloads/star_creatingwow_in.crt"),
+  ca: [
+  fs.readFileSync('C:/Users/mohit.barua_infobean/Downloads/DigiCertCA.crt')
+]};
+
+var port = normalizePort(process.env.PORT || '3000');
+app.set('port', port);
+
+/**
+ */
+
+var server = http.createServer(http_option, app);
+
+const io = socket(server);
+io.on("connection", function (socket) {
+
+  socket.on( 'subscribe', ( data ) => {
+      //subscribe/join a room
+      socket.join( data.room );
+      socket.join( data.socketId );
+      //Inform other members in the room of new user's arrival
+      if ( socket.adapter.rooms.has(data.room) === true ) {
+          socket.to( data.room ).emit( 'new user', { socketId: data.socketId } );
+      }
+  } );
+
+  socket.on( 'newUserStart', ( data ) => {
+      socket.to( data.to ).emit( 'newUserStart', { sender: data.sender } );
+  } );
+
+  socket.on( 'sdp', ( data ) => {
+      socket.to( data.to ).emit( 'sdp', { description: data.description, sender: data.sender } );
+  } );
+
+  socket.on( 'ice candidates', ( data ) => {
+      socket.to( data.to ).emit( 'ice candidates', { candidate: data.candidate, sender: data.sender } );
+  } );
+
+  socket.on( 'chat', ( data ) => {
+      console.log(data)
+      socket.to( data.room ).emit( 'chat', { sender: data.sender, msg: data.msg } );
+  } );
+
+  socket.on('voice', ( data ) => {
+      console.log(data);
+      socket.to( data.room ).emit('voice', data.transcript );
+  } );
+
+});
+
+/**
+ * Listen on provided port, on all network interfaces.
+ */
+
+ server.listen(port);
+ server.on('error', onError);
+ server.on('listening', onListening);
+
+/**
+ * Normalize a port into a number, string, or false.
+ */
+
+function normalizePort(val) {
+  var port = parseInt(val, 10);
+
+  if (isNaN(port)) {
+    // named pipe
+    return val;
+  }
+
+  if (port >= 0) {
+    // port number
+    return port;
+  }
+
+  return false;
+}
+
+/**
+ * Event listener for HTTP server "error" event.
+ */
+
+function onError(error) {
+  if (error.syscall !== 'listen') {
+    throw error;
+  }
+
+  var bind = typeof port === 'string'
+    ? 'Pipe ' + port
+    : 'Port ' + port;
+
+  // handle specific listen errors with friendly messages
+  switch (error.code) {
+    case 'EACCES':
+      console.error(bind + ' requires elevated privileges');
+      process.exit(1);
+      break;
+    case 'EADDRINUSE':
+      console.error(bind + ' is already in use');
+      process.exit(1);
+      break;
+    default:
+      throw error;
+  }
+}
+
+/**
+ * Event listener for HTTP server "listening" event.
+ */
+
+function onListening() {
+  var addr = server.address();
+  var bind = typeof addr === 'string'
+    ? 'pipe ' + addr
+    : 'port ' + addr.port;
+  debug('Listening on ' + bind);
+}
+
